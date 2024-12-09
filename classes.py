@@ -17,13 +17,13 @@ class Jogo:
 
         self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
         
-        self.add_rect_to_matrix(0, 60, 236, 10, self.floor_number, self.obstacles_matrix)
+        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 60, self.floor_number, 236, 10)
 
-        self.add_rect_to_matrix(20, 120, 236, 10, self.floor_number, self.obstacles_matrix)
+        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(20, 120, self.floor_number, 236, 10)
         
-        self.add_rect_to_matrix(0, 180, 236, 10, self.floor_number, self.obstacles_matrix)
+        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 180, self.floor_number, 236, 10)
 
-        self.add_rect_to_matrix(0, 235, 256, 10, self.floor_number, self.obstacles_matrix)
+        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 235, self.floor_number, 256, 10)
 
         self.avatar1 = Avatar(1, 1, 10, 30, self, ['W', 'A', 'S', 'D'])
 
@@ -51,10 +51,15 @@ class Jogo:
         pass
 
 
-    def add_rect_to_matrix(self, x, y, w, h, color, matrix):
+    def add_rect_to_matrix(self, x, y, color, w=0, h=0):
         
+        w = w if w else self.width
+        h = h if h else self.width
+
+        matrix = np.zeros(self.screenDim, np.int16)
         matrix[y:y+h, x:x+w] = color
-        self.matrix_to_txt(matrix, 'teste.txt')
+        return matrix
+
     
 
     def paint_screen(self, matrix):
@@ -76,7 +81,7 @@ class Jogo:
 class Avatar:
     def __init__(self, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys) -> None:
 
-        self.Jogo = Jogo
+        self.Jogo:Jogo = Jogo
 
         self.width = avatar_width
         self.height = avatar_height
@@ -88,29 +93,38 @@ class Avatar:
 
         self.screenDim = self.Jogo.screenDim
 
-        self.position_matrix = self.add_rect_to_matrix(self.x, self.y, self.Jogo.avatar_number)
+        self.position_matrix = self.Jogo.add_rect_to_matrix(self.x, self.y, self.Jogo.avatar_number, self.width, self.height)
         
         self.velocity = 1
         self.obstacles_matrix = self.Jogo.obstacles_matrix
+
+        self.running = False
 
         self.jumping = False
         self.falling = False
         self.onFloor = False
 
-        self.gravity_accel= 0.1
+        self.gravity_accel= 0.4
         self.jump_y0 = 0
-        self.jump_vel = 3
+        self.jump_vel = 5
         self.jump_t = 0
   
 
     def update(self):
             
             self.keyboard_movement()
-            
-            if not self.onFloor:
-                self.gravity()
 
             self.check_on_floor()
+
+            if self.jumping:
+               self.gravity()
+
+            if not self.onFloor and not self.jumping:
+                self.falling = True
+                self.gravity()
+
+
+            
 
     def add_rect_to_matrix(self, x, y, color):
         
@@ -122,80 +136,141 @@ class Avatar:
 
     def keyboard_movement(self):
 
-
-        if pyxel.btn(getattr(pyxel, 'KEY_' + self.movement_keys[3])): #D
-            self.x, self.y = self.goto_position(self.x+self.velocity, self.y)
-
-        if pyxel.btn(getattr(pyxel, 'KEY_'+self.movement_keys[1])): #A
-            self.x, self.y = self.goto_position(self.x-self.velocity, self.y)
-            
         if pyxel.btnp(getattr(pyxel, 'KEY_'+self.movement_keys[0])): #W
             self.jumping = True
-           # self.x, self.y = self.goto_position(self.x, self.y-self.velocity)
+           # self.gravity()
+            # self.x, self.y = 
+            #self.goto_position('y', -1)
+
+        if pyxel.btn(getattr(pyxel, 'KEY_'+self.movement_keys[1])): #A
+            # self.x, self.y = 
+            self.goto_position('x', -self.velocity)
+        
         
         if pyxel.btn(getattr(pyxel, 'KEY_'+self.movement_keys[2])): #S
-            self.x, self.y = self.goto_position(self.x, self.y+self.velocity)
+            # self.x, self.y = 
+            self.goto_position('y', self.velocity)
+
+        if pyxel.btn(getattr(pyxel, 'KEY_' + self.movement_keys[3])): #D
+            #self.x, self.y = 
+            self.goto_position('x', self.velocity)
 
         if pyxel.btn(pyxel.KEY_SPACE):
             print(self.x, self.y)
 
         if pyxel.btn(pyxel.KEY_SHIFT):
-            self.velocity = self.velocity*2      
+            self.running = 3
+        else:
+            self.running = 1
 
     
-    def goto_position(self, target_x, target_y):
+    def goto_position(self, axis, distance):
+        
+        if axis=='x':
+            target_y = self.y
+            target_x = pyxel.ceil(self.x+(distance*self.running))
+        else:
+            target_y = pyxel.ceil(self.y+(distance*self.running))
+            target_x = self.x
 
         if target_x+self.width>=self.screenDim[1] or target_x<0 or \
             target_y+self.height>=self.screenDim[0] or target_y<0:
+            print(target_x<0,  target_y+self.height>=self.screenDim[0] or target_y<0)
             return [self.x, self.y]
-        
-        matrix_test = self.obstacles_matrix + self.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number)
+
+        print(target_x, target_y)
+
+        matrix_test = self.obstacles_matrix + self.Jogo.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number, self.width, self.height)
+        self.Jogo.matrix_to_txt(matrix_test, 'teste')
 
         # return [target_x, target_y]
-        if np.count_nonzero(matrix_test==self.Jogo.floor_number+self.Jogo.avatar_number)==0:
-            self.position_matrix = self.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number)
-            return [target_x, target_y]
-        else:
 
-            return [self.x, self.y]
+        while np.count_nonzero(matrix_test==self.Jogo.floor_number+self.Jogo.avatar_number)!=0:
+            
+            fade = 1 if distance>0 else -1
+            if axis=='x':
+                target_x -= fade
+            else:
+                if fade==-1:
+                    target_y = self.y
+                else:
+                    target_y -= fade
+
+            matrix_test = self.obstacles_matrix + self.Jogo.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number, self.width, self.height)
+            self.Jogo.matrix_to_txt(matrix_test, 'teste')
+
+
+        self.position_matrix = self.Jogo.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number, self.width, self.height)
+
+        self.x, self.y = target_x, target_y
+        return [target_x, target_y]
+
+        
+            
 
     def check_on_floor(self):
 
         #print(self.Jogo.screen_matrix[self.y + self.height + 1, self.x:self.x+self.width].tolist())
-        if self.Jogo.screen_matrix[self.y + self.height + 1, self.x:self.x+self.width].tolist().count(self.Jogo.floor_number)==0:
+        if self.Jogo.screen_matrix[self.y + self.height, self.x:self.x+self.width].tolist().count(self.Jogo.floor_number)==0:
             self.onFloor = False
         else:
             self.onFloor = True
 
-        # print(self.onFloor)
-
     def gravity(self):
+
+       
         
         if self.jump_t==0:
-            self.jump_y0 = self.y  
+            self.jump_y0 = self.y
+            self.jump_t+=1
 
         if self.falling: 
             self.real_jump_vel = 0
-            new_y = (self.jump_y0 + (self.real_jump_vel*self.jump_t) -  ((1/2)*(self.gravity_accel)*(self.jump_t**2)))
         else:
             self.real_jump_vel = self.jump_vel
-            new_y = (self.jump_y0 - (self.real_jump_vel*self.jump_t) +  ((1/2)*(self.gravity_accel)*(self.jump_t**2)))
+        
 
-        self.x, self.y = self.goto_position(self.x, int(new_y))   
+        new_y = (self.jump_y0 - (self.real_jump_vel*self.jump_t) +  ((1/2)*(self.gravity_accel)*(self.jump_t**2)))
 
-        print(self.jump_y0, self.jump_t, self.y)
+        print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
+
+        self.goto_position('y', new_y-self.y)   
+
+        print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
 
         self.jump_t += 1
+
+        self.check_on_floor()
 
         if self.onFloor:
             self.jump_t=0
             self.jump_y0 = 0
             self.jumping=False
             self.falling=False
+            return None
 
+
+class Portal:
+
+    def __init__(self, x1, y1, x2, y2, Jogo) -> None:
+
+        self.Jogo:Jogo = Jogo
+
+        self.width = 4
+        self.height = 11
+
+        self.x1 = x1
+        self.y1 = y1
+        self.x2 = x2
+        self.y2 = y2
+
+        self.screenDim = self.Jogo.screenDim
+
+        self.position_matrix = self.Jogo.add_rect_to_matrix(self.x, self.y, self.Jogo.avatar_number)
         
+        self.velocity = 1
+        self.obstacles_matrix = self.Jogo.obstacles_matrix
 
-             
 
 
 Jogo()

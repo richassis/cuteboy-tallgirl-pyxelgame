@@ -15,6 +15,8 @@ class Jogo:
         
         pyxel.init(self.width, self.height, title="Jogo", fps=60)
 
+        pyxel.image(0).load(31,55, "sprites.png")
+
         self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
         
         self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 60, self.floor_number, 236, 10)
@@ -42,9 +44,9 @@ class Jogo:
 
     def draw(self):
         pyxel.cls(0)
-
+        pyxel.blt(20, 1, 0, 31, 55, 10, 30, 13)
         self.screen_matrix = self.obstacles_matrix + self.avatar1.position_matrix #+ self.avatar2.position_matrix
-        self.paint_screen(self.screen_matrix)
+        # self.paint_screen(self.screen_matrix)
 
         self.matrix_to_txt(self.screen_matrix, 'screen_matrix')
     

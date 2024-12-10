@@ -2,56 +2,76 @@
 import pyxel
 import numpy as np
 import time
+from Imagem import ImagemPPM as imgppg
 
 class Jogo:
     def __init__(self) -> None:
         
+        #DEFINIÇÕES DE DIMENSÕES DO JOGO
         self.width = 256
         self.height = 256
         self.screenDim = (self.height, self.width)
         
+        #DEFINIÇÕES DOS NUMEROS DE CADA OBJETO NA MATRIZ
+        self.background_number = 0
         self.floor_number = 2
         self.avatar_number = 1
+
+        #CRIAR MATRIZ COM OS OBSTACULOS (CHÃO)
+        self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
+        self.obstacles_matrix = imgppg("obstacles.pgm").matrix
         
+        #INICIALIZA PYXEL
         pyxel.init(self.width, self.height, title="Jogo", fps=60)
 
-        pyxel.image(0).load(0,0, "sprites.png")
+        #CARREGA A SPRITE E DEFINE OS INTERVALOS DAS ANIMAÇÕES DOS AVATARES
+        self.image_buffer = 0
+        pyxel.image(self.image_buffer).load(0,0, "sprites.png")
+        self.background_remove = 13
 
-        self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
-        
-        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 60, self.floor_number, 236, 10)
-
-        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(20, 120, self.floor_number, 236, 10)
-        
-        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 180, self.floor_number, 236, 10)
-
-        self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 235, self.floor_number, 256, 10)
-
-        list_sprites= [
-            [0,0,10,30],
-            [10,0,8,30],
-            [18,0,13,30]
+        avatar1_animations= [
+            [0,0,10,30], #frente
+            [10,0,8,30], #lado direito com perna fechada 
+            [18,0,13,30], #lado direito com perna aberta
+            [10,0,-8,30], #lado direito com perna fechada
+            [18,0,-13,30] #lado direito com perna aberta
         ]
-        self.avatar1 = Avatar(1, 1, 10, 30, self, ['W', 'A', 'S', 'D'], list_sprites)
 
-       # self.avatar2 = Avatar(20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'])
+        avatar2_animations= [
+            [0,30,10,25], #frente
+            [10,30,8,25], #lado direito com perna fechada 
+            [18,30,13,25], #lado direito com perna aberta
+            [10,30,-8,25], #lado direito com perna fechada 
+            [18,30,-13,25] #lado direito com perna aberta
+        ]
 
-        self.screen_matrix = self.obstacles_matrix+self.avatar1.position_matrix#+self.avatar2.position_matrix
 
+        self.avatar1 = Avatar(1, 1, 10, 30, self, ['W', 'A', 'S', 'D'], avatar1_animations)
+
+        self.avatar2 = Avatar(20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'], avatar2_animations)
+
+        self.screen_matrix = self.obstacles_matrix+self.avatar1.position_matrix+self.avatar2.position_matrix
+
+
+        #RODAR JOGO
         pyxel.run(self.update, self.draw)
-    
+
 
     def update(self):
 
         self.avatar1.update()
-       # self.avatar2.update()
+        self.avatar2.update()
 
 
     def draw(self):
         pyxel.cls(0)
-        pyxel.blt(20, 1, 0, 0, 0, 10, 30, 13)
-        self.screen_matrix = self.obstacles_matrix + self.avatar1.position_matrix #+ self.avatar2.position_matrix
-        # self.paint_screen(self.screen_matrix)
+
+        self.avatar1.draw()
+        self.avatar2.draw()
+
+        self.screen_matrix = self.obstacles_matrix + self.avatar1.position_matrix + self.avatar2.position_matrix
+        
+        self.paint_screen(self.obstacles_matrix)
 
         self.matrix_to_txt(self.screen_matrix, 'screen_matrix')
     
@@ -73,16 +93,15 @@ class Jogo:
 
         for y in range(self.height):
             for x in range(self.width):
-                # if matrix[y,x]!=0:
-                #print(x, y)
-                pyxel.pset(x, y, matrix[y,x])
+                if not matrix[y,x] in [self.background_number, self.avatar_number]:
+                    pyxel.pset(x, y, matrix[y,x])
 
     
     def matrix_to_txt(self, matrix, filename):
-
-        with open(filename+'.txt', 'w+') as f:
-            for line in matrix:
-                f.write(' '.join([str(int(h)) for h in line]) + '\n')        
+        a=0 
+        #with open(filename+'.txt', 'w+') as f:
+        #    for line in matrix:
+        #        f.write(' '.join([str(int(h)) for h in line]) + '\n')        
 
 
 class Avatar:
@@ -94,6 +113,7 @@ class Avatar:
         self.height = avatar_height
 
         self.direcoes = list_sprite
+        self.direcao_sprite = 0
 
         self.movement_keys = mov_keys
 
@@ -132,8 +152,18 @@ class Avatar:
                 self.falling = True
                 self.gravity()
 
+    def draw(self):
 
-            
+        self.draw_avatar()
+
+
+
+    def draw_avatar(self):
+
+        posicao_atual = self.direcoes[self.direcao_sprite]
+
+        pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
+                   posicao_atual[0], posicao_atual[1], posicao_atual[2], posicao_atual[3], self.Jogo.background_remove)
 
     def add_rect_to_matrix(self, x, y, color):
         
@@ -146,26 +176,39 @@ class Avatar:
     def keyboard_movement(self):
 
         if pyxel.btnp(getattr(pyxel, 'KEY_'+self.movement_keys[0])): #W
+            self.direcao_sprite = 0
             self.jumping = True
            # self.gravity()
             # self.x, self.y = 
             #self.goto_position('y', -1)
 
         if pyxel.btn(getattr(pyxel, 'KEY_'+self.movement_keys[1])): #A
-            # self.x, self.y = 
+
+            if self.direcao_sprite == 3:
+                if not self.jumping: self.direcao_sprite = 4
+            else:
+                self.direcao_sprite = 3
+
+
             self.goto_position('x', -self.velocity)
         
         
         if pyxel.btn(getattr(pyxel, 'KEY_'+self.movement_keys[2])): #S
-            # self.x, self.y = 
+
             self.goto_position('y', self.velocity)
 
         if pyxel.btn(getattr(pyxel, 'KEY_' + self.movement_keys[3])): #D
-            #self.x, self.y = 
+
+            if self.direcao_sprite == 1:
+                if not self.jumping: self.direcao_sprite = 2
+            else:
+                self.direcao_sprite = 1
+
             self.goto_position('x', self.velocity)
 
         if pyxel.btn(pyxel.KEY_SPACE):
-            print(self.x, self.y)
+            A=0
+        #    print(self.x, self.y)
 
         if pyxel.btn(pyxel.KEY_SHIFT):
             self.running = 3
@@ -184,10 +227,10 @@ class Avatar:
 
         if target_x+self.width>=self.screenDim[1] or target_x<0 or \
             target_y+self.height>=self.screenDim[0] or target_y<0:
-            print(target_x<0,  target_y+self.height>=self.screenDim[0] or target_y<0)
+            #print(target_x<0,  target_y+self.height>=self.screenDim[0] or target_y<0)
             return [self.x, self.y]
 
-        print(target_x, target_y)
+        #print(target_x, target_y)
 
         matrix_test = self.obstacles_matrix + self.Jogo.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number, self.width, self.height)
         self.Jogo.matrix_to_txt(matrix_test, 'teste')
@@ -241,11 +284,11 @@ class Avatar:
 
         new_y = (self.jump_y0 - (self.real_jump_vel*self.jump_t) +  ((1/2)*(self.gravity_accel)*(self.jump_t**2)))
 
-        print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
+        # print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
 
         self.goto_position('y', new_y-self.y)   
 
-        print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
+        # print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
 
         self.jump_t += 1
 
@@ -287,4 +330,5 @@ Jogo()
 class Teste:
     
     def __init__(self) -> None:
+
         print('Teste')

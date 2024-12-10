@@ -15,7 +15,7 @@ class Jogo:
         
         pyxel.init(self.width, self.height, title="Jogo", fps=60)
 
-        pyxel.image(0).load(31,55, "sprites.png")
+        pyxel.image(0).load(0,0, "sprites.png")
 
         self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
         
@@ -27,7 +27,12 @@ class Jogo:
 
         self.obstacles_matrix = self.obstacles_matrix + self.add_rect_to_matrix(0, 235, self.floor_number, 256, 10)
 
-        self.avatar1 = Avatar(1, 1, 10, 30, self, ['W', 'A', 'S', 'D'])
+        list_sprites= [
+            [0,0,10,30],
+            [10,0,8,30],
+            [18,0,13,30]
+        ]
+        self.avatar1 = Avatar(1, 1, 10, 30, self, ['W', 'A', 'S', 'D'], list_sprites)
 
        # self.avatar2 = Avatar(20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'])
 
@@ -44,7 +49,7 @@ class Jogo:
 
     def draw(self):
         pyxel.cls(0)
-        pyxel.blt(20, 1, 0, 31, 55, 10, 30, 13)
+        pyxel.blt(20, 1, 0, 0, 0, 10, 30, 13)
         self.screen_matrix = self.obstacles_matrix + self.avatar1.position_matrix #+ self.avatar2.position_matrix
         # self.paint_screen(self.screen_matrix)
 
@@ -81,12 +86,14 @@ class Jogo:
 
 
 class Avatar:
-    def __init__(self, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys) -> None:
+    def __init__(self, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys, list_sprite) -> None:
 
         self.Jogo:Jogo = Jogo
 
         self.width = avatar_width
         self.height = avatar_height
+
+        self.direcoes = list_sprite
 
         self.movement_keys = mov_keys
 

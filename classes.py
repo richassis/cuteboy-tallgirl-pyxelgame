@@ -46,9 +46,9 @@ class Jogo:
         ]
 
 
-        self.avatar1 = Avatar(1, 1, 10, 30, self, ['W', 'A', 'S', 'D'], avatar1_animations)
+        self.avatar1 = Avatar('tallgirl', 1, 1, 10, 30, self, ['W', 'A', 'S', 'D'], avatar1_animations)
 
-        self.avatar2 = Avatar(20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'], avatar2_animations)
+        self.avatar2 = Avatar('cuteboy', 20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'], avatar2_animations)
 
         self.screen_matrix = self.obstacles_matrix+self.avatar1.position_matrix+self.avatar2.position_matrix
 
@@ -73,7 +73,7 @@ class Jogo:
         
         self.paint_screen(self.obstacles_matrix)
 
-        self.matrix_to_txt(self.screen_matrix, 'screen_matrix')
+        # self.matrix_to_txt(self.screen_matrix, 'screen_matrix')
     
         pass
 
@@ -98,14 +98,16 @@ class Jogo:
 
     
     def matrix_to_txt(self, matrix, filename):
-        a=0 
-        #with open(filename+'.txt', 'w+') as f:
-        #    for line in matrix:
-        #        f.write(' '.join([str(int(h)) for h in line]) + '\n')        
+        
+        with open(filename+'.txt', 'w+') as f:
+           for line in matrix:
+               f.write(' '.join([str(int(h)) for h in line]) + '\n')        
 
 
 class Avatar:
-    def __init__(self, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys, list_sprite) -> None:
+    def __init__(self, avatar, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys, list_sprite) -> None:
+
+        self.avatar = avatar
 
         self.Jogo:Jogo = Jogo
 
@@ -114,6 +116,8 @@ class Avatar:
 
         self.direcoes = list_sprite
         self.direcao_sprite = 0
+        self.animation_cap = 7
+        self.animation_it = 0
 
         self.movement_keys = mov_keys
 
@@ -131,11 +135,15 @@ class Avatar:
 
         self.jumping = False
         self.falling = False
-        self.onFloor = False
 
-        self.gravity_accel= 0.4
+        self.onFloor = False
+        self.underCeiling = False
+        self.rightWall = False
+        self.leftWall = False
+
+        self.gravity_accel= 0.35
         self.jump_y0 = 0
-        self.jump_vel = 5
+        self.jump_vel = 8
         self.jump_t = 0
   
 
@@ -143,7 +151,7 @@ class Avatar:
             
             self.keyboard_movement()
 
-            self.check_on_floor()
+            # self.check_on_floor()
 
             if self.jumping:
                self.gravity()
@@ -155,7 +163,6 @@ class Avatar:
     def draw(self):
 
         self.draw_avatar()
-
 
 
     def draw_avatar(self):
@@ -178,17 +185,11 @@ class Avatar:
         if pyxel.btnp(getattr(pyxel, 'KEY_'+self.movement_keys[0])): #W
             self.direcao_sprite = 0
             self.jumping = True
-           # self.gravity()
-            # self.x, self.y = 
-            #self.goto_position('y', -1)
+
 
         if pyxel.btn(getattr(pyxel, 'KEY_'+self.movement_keys[1])): #A
 
-            if self.direcao_sprite == 3:
-                if not self.jumping: self.direcao_sprite = 4
-            else:
-                self.direcao_sprite = 3
-
+            self.movement_animation('left')
 
             self.goto_position('x', -self.velocity)
         
@@ -199,10 +200,7 @@ class Avatar:
 
         if pyxel.btn(getattr(pyxel, 'KEY_' + self.movement_keys[3])): #D
 
-            if self.direcao_sprite == 1:
-                if not self.jumping: self.direcao_sprite = 2
-            else:
-                self.direcao_sprite = 1
+            self.movement_animation('right')
 
             self.goto_position('x', self.velocity)
 
@@ -218,27 +216,53 @@ class Avatar:
     
     def goto_position(self, axis, distance):
         
-        if axis=='x':
-            target_y = self.y
-            target_x = pyxel.ceil(self.x+(distance*self.running))
-        else:
-            target_y = pyxel.ceil(self.y+(distance*self.running))
-            target_x = self.x
+        match axis:
+
+            case 'x':
+                target_y = self.y
+                target_x = pyxel.ceil(self.x+(distance*self.running))
+            case 'y':
+                target_y = pyxel.ceil(self.y+(distance*self.running))
+                target_x = self.x
+
 
         if target_x+self.width>=self.screenDim[1] or target_x<0 or \
             target_y+self.height>=self.screenDim[0] or target_y<0:
-            #print(target_x<0,  target_y+self.height>=self.screenDim[0] or target_y<0)
-            return [self.x, self.y]
 
-        #print(target_x, target_y)
+            return [self.x, self.y]
+        
+
 
         matrix_test = self.obstacles_matrix + self.Jogo.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number, self.width, self.height)
-        self.Jogo.matrix_to_txt(matrix_test, 'teste')
+        # self.Jogo.matrix_to_txt(matrix_test, self.avatar)
 
-        # return [target_x, target_y]
+        avatar_right_border = self.Jogo.screen_matrix[target_y: target_y+self.height, target_x + self.width].tolist()
+        avatar_left_border = self.Jogo.screen_matrix[target_y: target_y+self.height, target_x].tolist()
+        
+        avatar_bottom_border = self.Jogo.screen_matrix[target_y + self.height, target_x:target_x+self.width].tolist()
+        avatar_top_border = self.Jogo.screen_matrix[target_y, target_x:target_x+self.width].tolist()
+
+        self.rightWall = False
+        self.leftWall = False
+
+        if avatar_right_border.count(self.Jogo.floor_number)>0:
+            self.rightWall = True
+        
+        elif avatar_left_border.count(self.Jogo.floor_number)>0:
+            self.leftWall = True
+
+        self.onFloor = False
+        self.underCeiling = False
+        if avatar_bottom_border.count(self.Jogo.floor_number)>0:
+            self.onFloor = True
+        
+        elif avatar_top_border.count(self.Jogo.floor_number)>0:
+            self.underCeiling = True
+
+        print(self.onFloor)
 
         while np.count_nonzero(matrix_test==self.Jogo.floor_number+self.Jogo.avatar_number)!=0:
-            
+
             fade = 1 if distance>0 else -1
             if axis=='x':
                 target_x -= fade
@@ -249,7 +273,7 @@ class Avatar:
                     target_y -= fade
 
             matrix_test = self.obstacles_matrix + self.Jogo.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number, self.width, self.height)
-            self.Jogo.matrix_to_txt(matrix_test, 'teste')
+            # self.Jogo.matrix_to_txt(matrix_test, 'teste')
 
 
         self.position_matrix = self.Jogo.add_rect_to_matrix(target_x, target_y, self.Jogo.avatar_number, self.width, self.height)
@@ -258,20 +282,46 @@ class Avatar:
         return [target_x, target_y]
 
         
+    def movement_animation(self, dir):
+
+        match dir:
+            case 'right':
+                perna_fechada = 1
+                perna_aberta = 2
             
+            case 'left':
+                perna_fechada = 3
+                perna_aberta = 4
+
+        self.animation_it+=1
+            
+        if self.direcao_sprite != perna_fechada and self.direcao_sprite != perna_aberta:
+            self.direcao_sprite = perna_aberta
+        
+        else:
+            
+            if self.animation_it > self.animation_cap:
+
+                if self.direcao_sprite == perna_aberta:
+                    if not self.jumping: self.direcao_sprite = perna_fechada
+
+                else: 
+                    self.direcao_sprite = perna_aberta
+
+                self.animation_it = 0
 
     def check_on_floor(self):
 
+        a = 0
         #print(self.Jogo.screen_matrix[self.y + self.height + 1, self.x:self.x+self.width].tolist())
-        if self.Jogo.screen_matrix[self.y + self.height, self.x:self.x+self.width].tolist().count(self.Jogo.floor_number)==0:
-            self.onFloor = False
-        else:
-            self.onFloor = True
+        # linha_abaixo_avatar = self.Jogo.screen_matrix[self.y + self.height, self.x:self.x+self.width].tolist()
+        # if linha_abaixo_avatar.count(self.Jogo.floor_number)==0:
+        #     self.onFloor = False
+        # else:
+        #     self.onFloor = True
 
     def gravity(self):
 
-       
-        
         if self.jump_t==0:
             self.jump_y0 = self.y
             self.jump_t+=1
@@ -284,15 +334,17 @@ class Avatar:
 
         new_y = (self.jump_y0 - (self.real_jump_vel*self.jump_t) +  ((1/2)*(self.gravity_accel)*(self.jump_t**2)))
 
-        # print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
-
         self.goto_position('y', new_y-self.y)   
 
         # print(self.jump_y0, self.jump_t, new_y, new_y-self.y, self.y)
 
         self.jump_t += 1
 
-        self.check_on_floor()
+        if self.underCeiling:
+            self.jump_t=0
+            self.jump_y0 = 0
+            self.jumping=False
+            self.falling=True
 
         if self.onFloor:
             self.jump_t=0
@@ -304,24 +356,58 @@ class Avatar:
 
 class Portal:
 
-    def __init__(self, x1, y1, x2, y2, Jogo) -> None:
+    def __init__(self, id, x, y, Jogo) -> None:
 
         self.Jogo:Jogo = Jogo
 
         self.width = 4
         self.height = 11
 
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
+        self.id = id
+
+        self.x = x
+        self.y = y
 
         self.screenDim = self.Jogo.screenDim
 
         self.position_matrix = self.Jogo.add_rect_to_matrix(self.x, self.y, self.Jogo.avatar_number)
         
-        self.velocity = 1
-        self.obstacles_matrix = self.Jogo.obstacles_matrix
+
+class Button:
+    
+    def __init__(self, id, x, y, Jogo):
+
+        self.id = id
+
+        self.x = x
+        self.y = y
+
+        self.Jogo = Jogo
+        pass
+
+class Lever:
+
+    def __init__(self, id, x, y, Jogo):
+
+        self.id = id
+
+        self.x = x
+        self.y = y
+
+        self.Jogo = Jogo
+        pass
+
+class Gate:
+    
+    def __init__(self, id, x, y, Jogo):
+
+        self.id = id
+
+        self.x = x
+        self.y = y
+
+        self.Jogo = Jogo
+        pass
 
 
 

@@ -71,17 +71,10 @@ class Imagem:
             self.dimension = (self.height, self.width*3)
             self.matrix = np.zeros(self.dimension, np.int64)
 
-            print(self.matrix)
-
             for i in range(self.height):
                 for j in range(self.width):
-                    print(i, (j*3),':',(j*3)+3)
-                    print(self.matrix[i, (j*3):(j*3)+3])
-                    print(imgList[index*3:index*3+3])
                     self.matrix[i, (j*3):(j*3)+3] = imgList[index*3:index*3+3]
                     index += 1
-
-        print(self.matrix)
 
         arq.close()
     

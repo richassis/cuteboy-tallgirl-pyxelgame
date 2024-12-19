@@ -19,7 +19,6 @@ class Jogo:
 
         #CRIAR MATRIZ COM OS OBSTACULOS (CHÃO)
         self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
-        self.obstacles_matrix = imgppg("obstacles.pgm").matrix
         
         #INICIALIZA PYXEL
         pyxel.init(self.width, self.height, title="Jogo", fps=60)
@@ -31,38 +30,48 @@ class Jogo:
         
         self.background_remove = 13
 
-        avatar1_animations= [
-            [0,0,10,30], #frente
-            [10,0,8,30], #lado direito com perna fechada 
-            [18,0,13,30], #lado direito com perna aberta
-            [10,0,-8,30], #lado direito com perna fechada
-            [18,0,-13,30] #lado direito com perna aberta
-        ]
+        self.avatar1 = Avatar('tallgirl', 1, 1, 10, 30, self, ['W', 'A', 'S', 'D'])
 
-        avatar2_animations= [
-            [0,30,10,25], #frente
-            [10,30,8,25], #lado direito com perna fechada 
-            [18,30,13,25], #lado direito com perna aberta
-            [10,30,-8,25], #lado direito com perna fechada 
-            [18,30,-13,25] #lado direito com perna aberta
-        ]
+        self.avatar2 = Avatar('cuteboy', 20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'])
+        
+        self.avatars_matrix = self.avatar1.position_matrix+self.avatar2.position_matrix
 
-
-        self.avatar1 = Avatar('tallgirl', 1, 1, 10, 30, self, ['W', 'A', 'S', 'D'], avatar1_animations)
-
-        self.avatar2 = Avatar('cuteboy', 20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'], avatar2_animations)
-
-        self.screen_matrix = self.obstacles_matrix #+self.avatar1.position_matrix+self.avatar2.position_matrix
-
+        self.construct_map_objects(1)
 
         #RODAR JOGO
         pyxel.run(self.update, self.draw)
 
 
+    def construct_map_objects(self, level):
+        
+        if level==1:
+
+            self.obstacles_matrix = imgppg("obstacles.pgm").matrix
+
+            self.gate1 = GateSystem('purple', self, buttons=[[1, 59]], gates=[[100, 32]])
+
+            self.gate2 = GateSystem('green', self, levers=[[150, 52]], gates=[[200, 32]])
+
+            pass
+
+            
+        pass
+
+
     def update(self):
+        
+        self.screen_matrix = self.obstacles_matrix.copy()
+
+        self.gate1.update()
+        self.gate2.update()
 
         self.avatar1.update()
         self.avatar2.update()
+        self.avatars_matrix = self.avatar1.position_matrix+self.avatar2.position_matrix
+
+        # self.matrix_to_txt(self.avatars_matrix, 'testenew')
+
+
 
 
     def draw(self):
@@ -70,12 +79,12 @@ class Jogo:
 
         self.avatar1.draw()
         self.avatar2.draw()
-
-        #self.screen_matrix = self.obstacles_matrix #+ self.avatar1.position_matrix + self.avatar2.position_matrix
         
         self.paint_screen(self.obstacles_matrix)
-
-        # self.matrix_to_txt(self.screen_matrix, 'screen_matrix')
+        
+        self.gate1.draw()
+        self.gate2.draw()
+        
     
         pass
 
@@ -106,8 +115,9 @@ class Jogo:
                f.write(' '.join([str(int(h)) for h in line]) + '\n')        
 
 
+
 class Avatar:
-    def __init__(self, avatar, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys, list_sprite) -> None:
+    def __init__(self, avatar, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys) -> None:
 
         self.avatar = avatar
 
@@ -116,7 +126,23 @@ class Avatar:
         self.width = avatar_width
         self.height = avatar_height
 
-        self.direcoes = list_sprite
+        if self.avatar == 'tallgirl':
+            self.direcoes= [
+                [0,0,10,30], #frente
+                [10,0,8,30], #lado direito com perna fechada 
+                [18,0,13,30], #lado direito com perna aberta
+                [10,0,-8,30], #lado direito com perna fechada
+                [18,0,-13,30] #lado direito com perna aberta
+            ]
+        else:
+            self.direcoes= [
+                [0,30,10,25], #frente
+                [10,30,8,25], #lado direito com perna fechada 
+                [18,30,13,25], #lado direito com perna aberta
+                [10,30,-8,25], #lado direito com perna fechada 
+                [18,30,-13,25] #lado direito com perna aberta
+            ]
+
         self.direcao_sprite = 0
         self.animation_cap = 7
         self.animation_it = 0
@@ -160,6 +186,7 @@ class Avatar:
             self.falling = True
             self.gravity()
 
+        self.position_matrix = self.Jogo.add_rect_to_matrix(self.x, self.y, self.Jogo.avatar_number, self.width, self.height)
 
     def draw(self):
 
@@ -228,7 +255,7 @@ class Avatar:
                 next_y = self.y
 
             if next_x + self.width >= self.screenDim[1] or next_x < 0 or \
-            next_y + self.height >= self.screenDim[0] or next_y < 0:
+               next_y + self.height >= self.screenDim[0] or next_y < 0:
                 break
 
             avatar_bottom_border = self.Jogo.screen_matrix[next_y + self.height, next_x:next_x + self.width].tolist()
@@ -252,51 +279,6 @@ class Avatar:
 
             if not self.onFloor and not self.underCeiling and not self.rightWall and not self.leftWall:
                 self.x, self.y = next_x, next_y
-            else:
-                break
-
-        
-        return [self.x, self.y]
-
-    
-    def goto_position(self, axis, distance):
-        increment = 1  # Tamanho do incremento para verificar colisão
-        steps = int(abs(distance))  # Número de passos a serem dados
-        direction = 1 if distance > 0 else -1  # Direção do movimento
-
-        for _ in range(steps):
-            if axis == 'x':
-                target_x = self.x + direction * increment
-                target_y = self.y
-            elif axis == 'y':
-                target_x = self.x
-                target_y = self.y + direction * increment
-
-            if target_x + self.width >= self.screenDim[1] or target_x < 0 or \
-            target_y + self.height >= self.screenDim[0] or target_y < 0:
-                break
-
-            avatar_bottom_border = self.Jogo.screen_matrix[target_y + self.height, target_x:target_x + self.width].tolist()
-            avatar_top_border = self.Jogo.screen_matrix[target_y, target_x:target_x + self.width].tolist()
-            avatar_right_border = self.Jogo.screen_matrix[target_y:target_y + self.height, target_x + self.width].tolist()
-            avatar_left_border = self.Jogo.screen_matrix[target_y:target_y + self.height, target_x].tolist()
-
-            self.rightWall = False
-            self.leftWall = False
-            self.onFloor = False
-            self.underCeiling = False
-
-            if avatar_right_border.count(self.Jogo.floor_number) > 0:
-                self.rightWall = True
-            elif avatar_left_border.count(self.Jogo.floor_number) > 0:
-                self.leftWall = True
-            if avatar_bottom_border.count(self.Jogo.floor_number) > 0:
-                self.onFloor = True
-            elif avatar_top_border.count(self.Jogo.floor_number) > 0:
-                self.underCeiling = True
-
-            if not self.onFloor and not self.underCeiling and not self.rightWall and not self.leftWall:
-                self.x, self.y = target_x, target_y
             else:
                 break
 
@@ -332,16 +314,13 @@ class Avatar:
                 self.animation_it = 0
 
     def gravity(self):
-        gravity_force = 1  # Força da gravidade por incremento
-        max_fall_speed = 5  # Velocidade máxima de queda
+        gravity_force = 1 
+        max_fall_speed = 5 
 
-        # Incrementar a velocidade de queda até o máximo permitido
         self.fall_speed = min(self.fall_speed + gravity_force, max_fall_speed)
 
-        # Calcular a nova posição y
         target_y = self.y + self.fall_speed
 
-        # Atualizar a posição usando a nova função
         self.update_position(self.x, target_y)
 
         if self.onFloor:
@@ -353,12 +332,203 @@ class Avatar:
     def jump(self):
         if self.onFloor and not self.jumping:
             self.jumping = True
-            self.fall_speed = -13  # Velocidade inicial do salto
-
+            self.fall_speed = -13
     
 
-    
 
+class GateSystem:
+
+    def __init__(self, id, Jogo, gates, buttons=[], levers=[]):
+        
+        self.id = id
+        self.Jogo = Jogo
+
+        self.objects = []
+
+        for coords in buttons:
+            self.objects.append(Button(coords[0], coords[1], self.Jogo, self))
+            
+        for coords in levers:
+            self.objects.append(Lever(coords[0], coords[1], self.Jogo, self))
+
+        for coords in gates:
+            self.objects.append(Gate(coords[0], coords[1], self.Jogo, self))
+
+        self.state = 0 #0- não pressionado, 1-pressionado
+
+        pass
+
+    def update(self):
+
+        for obj in self.objects:
+            obj.update()
+
+    def draw(self):
+
+        for obj in self.objects:
+            obj.draw()
+
+
+
+class Button:
+    
+    def __init__(self, x, y, Jogo, gateSystem):
+        
+        self.Jogo = Jogo
+        self.gateSystem = gateSystem
+
+        self.x = x
+        self.y = y
+
+        self.width = 10
+        self.height = 3
+
+        match self.gateSystem.id:
+            case 'green':
+                self.animation = [
+                    [31, 49],
+                    [41, 49]
+                    ]
+            case 'purple':
+                self.animation = [
+                    [31, 52],
+                    [41, 52]
+                ]
+        
+        pass
+
+
+    def update(self):
+        
+        lista_unica = [item for sublist in self.Jogo.avatars_matrix[self.y:self.y+self.height, self.x:self.x+self.width].tolist() for item in sublist]
+
+        if lista_unica.count(self.Jogo.avatar_number)>self.width*self.height/3:
+            # print('no botao!!')
+            self.gateSystem.state = 1
+        else:
+            self.gateSystem.state = 0
+
+        pass
+
+    def draw(self):
+
+        posicao_atual = self.animation[self.gateSystem.state]
+
+        pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
+                   posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
+        pass
+
+class Lever:
+
+    def __init__(self, x, y, Jogo, gateSystem):
+        
+        self.Jogo = Jogo
+        self.gateSystem = gateSystem
+
+        self.x = x
+        self.y = y
+
+        self.width = 10
+        self.height = 10
+
+        self.onTop = True
+
+        match self.gateSystem.id:
+            case 'green':
+                self.animation = [
+                    [41, 19],
+                    [41, 29]
+                    ]
+            case 'purple':
+                self.animation = [
+                    [31, 39],
+                    [41, 39]
+                ]
+        
+        pass
+
+
+    def update(self):
+        
+        lista_unica = [item for sublist in self.Jogo.avatars_matrix[self.y:self.y+self.height, self.x:self.x+self.width].tolist() for item in sublist]
+
+        if lista_unica.count(self.Jogo.avatar_number)>self.width*self.height/3:
+            
+            print('no botao!!')
+            
+            if self.onTop==False:
+                self.gateSystem.state = not self.gateSystem.state
+                self.onTop = True
+        else:
+            print('false')
+            self.onTop = False
+        pass
+
+    def draw(self):
+
+        posicao_atual = self.animation[self.gateSystem.state]
+
+        pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
+                   posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
+        pass
+
+
+class Gate:
+    
+    def __init__(self, x, y, Jogo, gateSystem):
+        
+        self.Jogo = Jogo
+        self.gateSystem = gateSystem
+
+        self.x = x
+        self.y = y
+
+        self.width = 3
+        self.height = 30
+
+        self.matrix = np.zeros(self.Jogo.screenDim, np.int16)
+
+        match self.gateSystem.id:
+            case 'green':
+                self.animation = [
+                    [34, 0],
+                    
+                    ]
+            case 'purple':
+                self.animation = [
+                    [31, 0]
+                ]
+        
+        pass
+
+
+    def update(self):
+
+        new_x = self.x
+        new_y = self.y if self.gateSystem.state==0 else self.y-self.height-5
+
+        # self.matrix = self.Jogo.obstacles_matrix.copy()
+
+        self.Jogo.screen_matrix[new_y:new_y+self.height, new_x:new_x+self.width] = self.Jogo.floor_number
+
+        # self.Jogo.screen_matrix = self.Jogo.screen_matrix + self.matrix
+        
+        
+        pass
+
+    def draw(self):
+
+        posicao_atual = self.animation[0]
+
+        new_x = self.x
+        new_y = self.y if self.gateSystem.state==0 else self.y-self.height-5
+
+        pyxel.blt(new_x, new_y, self.Jogo.image_buffer,
+                   posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
+        
+        # self.Jogo.matrix_to_txt(self.Jogo.screen_matrix, 'newmatrix')
+        
+        pass
 
 
 
@@ -377,46 +547,6 @@ class Portal:
         self.y = y
 
         self.screenDim = self.Jogo.screenDim
-
-        self.position_matrix = self.Jogo.add_rect_to_matrix(self.x, self.y, self.Jogo.avatar_number)
-        
-
-class Button:
-    
-    def __init__(self, id, x, y, Jogo):
-
-        self.id = id
-
-        self.x = x
-        self.y = y
-
-        self.Jogo = Jogo
-        pass
-
-class Lever:
-
-    def __init__(self, id, x, y, Jogo):
-
-        self.id = id
-
-        self.x = x
-        self.y = y
-
-        self.Jogo = Jogo
-        pass
-
-class Gate:
-    
-    def __init__(self, id, x, y, Jogo):
-
-        self.id = id
-
-        self.x = x
-        self.y = y
-
-        self.Jogo = Jogo
-        pass
-
 
 
 Jogo()

@@ -93,6 +93,11 @@ class Jogo:
 
         pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
 
+        #portas
+        pyxel.blt(3, 218, 0, 51, 0, 65, 30, 13)
+        pyxel.blt(20, 223, 0, 51, 30, 55, 65, 13)
+
+        
         self.avatar1.draw()
         self.avatar2.draw()
         

@@ -11,6 +11,10 @@ class Jogo:
         self.width = 256
         self.height = 256
         self.screenDim = (self.height, self.width)
+
+        #TEMPORIZADOR
+        self.fps= 60
+        self.timer= self.fps*30
         
         #DEFINIÇÕES DOS NUMEROS DE CADA OBJETO NA MATRIZ
         self.background_number = 0
@@ -21,7 +25,7 @@ class Jogo:
         self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
         
         #INICIALIZA PYXEL
-        pyxel.init(self.width, self.height, title="Jogo", fps=60)
+        pyxel.init(self.width, self.height, title="Jogo", fps=self.fps)
 
         #CARREGA A SPRITE E DEFINE OS INTERVALOS DAS ANIMAÇÕES DOS AVATARES
         self.image_buffer = 0
@@ -41,6 +45,10 @@ class Jogo:
         #RODAR JOGO
         pyxel.run(self.update, self.draw)
 
+    def reset_jogo(self): #resetar e voltar pra posição inicial
+        self.timer = self.fps*30 
+        self.avatar1 = Avatar('tallgirl', 1, 1, 10, 30, self, ['W', 'A', 'S', 'D'])
+        self.avatar2 = Avatar('cuteboy', 20, 1, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'])
 
     def construct_map_objects(self, level):
         
@@ -57,6 +65,12 @@ class Jogo:
 
 
     def update(self):
+
+        #aqui é pra funcionar o temporizador certinho e reiniciar
+        if self.timer > 0:
+            self.timer -= 1
+        else:
+            self.reset_jogo()
         
         self.screen_matrix = self.obstacles_matrix.copy()
 
@@ -75,6 +89,13 @@ class Jogo:
     def draw(self):
         pyxel.cls(0)
 
+        pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
+
+        #portas
+        pyxel.blt(3, 218, 0, 51, 0, 65, 30, 13)
+        pyxel.blt(20, 223, 0, 51, 30, 55, 65, 13)
+
+        
         self.avatar1.draw()
         self.avatar2.draw()
         
@@ -129,16 +150,16 @@ class Avatar:
                 [0,0,10,30], #frente
                 [10,0,8,30], #lado direito com perna fechada 
                 [18,0,13,30], #lado direito com perna aberta
-                [10,0,-8,30], #lado direito com perna fechada
-                [18,0,-13,30] #lado direito com perna aberta
+                [10,0,-8,30], #lado esquerdo com perna fechada
+                [18,0,-13,30] #lado esquerdo com perna aberta
             ]
         else:
             self.direcoes= [
                 [0,30,10,25], #frente
                 [10,30,8,25], #lado direito com perna fechada 
                 [18,30,13,25], #lado direito com perna aberta
-                [10,30,-8,25], #lado direito com perna fechada 
-                [18,30,-13,25] #lado direito com perna aberta
+                [10,30,-8,25], #lado esquerdo com perna fechada 
+                [18,30,-13,25] #lado esquerdo com perna aberta
             ]
 
         self.direcao_sprite = 0

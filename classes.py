@@ -14,7 +14,7 @@ class Jogo:
         
         #DEFINIÇÕES DOS NUMEROS DE CADA OBJETO NA MATRIZ
         self.background_number = 0
-        self.floor_number = 2
+        self.floor_number = 3
         self.avatar_number = 1
 
         #CRIAR MATRIZ COM OS OBSTACULOS (CHÃO)
@@ -26,7 +26,7 @@ class Jogo:
         #CARREGA A SPRITE E DEFINE OS INTERVALOS DAS ANIMAÇÕES DOS AVATARES
         self.image_buffer = 0
         
-        pyxel.image(self.image_buffer).load(0,0, "sprites.png")
+        pyxel.images[self.image_buffer].load(0,0, "sprites.png")
         
         self.background_remove = 13
 
@@ -44,18 +44,16 @@ class Jogo:
 
     def construct_map_objects(self, level):
         
-        if level==1:
+        match level:
+            case 1:
+                
+                pgm = imgppg("obstacles.pgm")
+                self.obstacles_matrix = np.where(pgm.matrix == 1, self.floor_number, pgm.matrix)
 
-            self.obstacles_matrix = imgppg("obstacles.pgm").matrix
+                self.gate1 = GateSystem('purple', self, buttons=[[1, 59], [110, 59]], gates=[[100, 32, 0, 'ver'], [230, 62, 1, 'hor']])
 
-            self.gate1 = GateSystem('purple', self, buttons=[[1, 59]], gates=[[100, 32]])
+                self.gate2 = GateSystem('green', self, buttons=[[150, 59]], levers=[[210, 52]], gates=[[200, 32, 0, 'ver']])
 
-            self.gate2 = GateSystem('green', self, levers=[[150, 52]], gates=[[200, 32]])
-
-            pass
-
-            
-        pass
 
 
     def update(self):
@@ -345,23 +343,25 @@ class GateSystem:
 
         self.objects = []
 
-        for coords in buttons:
-            self.objects.append(Button(coords[0], coords[1], self.Jogo, self))
+        for params in buttons:
+            self.objects.append(Button(params[0], params[1], self.Jogo, self))
             
-        for coords in levers:
-            self.objects.append(Lever(coords[0], coords[1], self.Jogo, self))
+        for params in levers:
+            self.objects.append(Lever(params[0], params[1], self.Jogo, self))
 
-        for coords in gates:
-            self.objects.append(Gate(coords[0], coords[1], self.Jogo, self))
+        for params in gates:
+            self.objects.append(Gate(params[0], params[1], params[2], params[3], self.Jogo, self))
 
         self.state = 0 #0- não pressionado, 1-pressionado
 
         pass
 
     def update(self):
-
+        
+        self.state = 0
         for obj in self.objects:
             obj.update()
+            if self.state==0: self.state = obj.state
 
     def draw(self):
 
@@ -383,6 +383,8 @@ class Button:
         self.width = 10
         self.height = 3
 
+        self.state = 0
+
         match self.gateSystem.id:
             case 'green':
                 self.animation = [
@@ -399,20 +401,22 @@ class Button:
 
 
     def update(self):
-        
-        lista_unica = [item for sublist in self.Jogo.avatars_matrix[self.y:self.y+self.height, self.x:self.x+self.width].tolist() for item in sublist]
 
-        if lista_unica.count(self.Jogo.avatar_number)>self.width*self.height/3:
-            # print('no botao!!')
-            self.gateSystem.state = 1
+        button_area_matrix = self.Jogo.avatars_matrix[self.y:self.y+self.height, self.x:self.x+self.width]
+        
+        if np.count_nonzero(button_area_matrix)>self.width*self.height/3:
+
+            self.state = 1
+
         else:
-            self.gateSystem.state = 0
+
+            self.state = 0
 
         pass
 
     def draw(self):
 
-        posicao_atual = self.animation[self.gateSystem.state]
+        posicao_atual = self.animation[self.state]
 
         pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
                    posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
@@ -432,6 +436,7 @@ class Lever:
         self.height = 10
 
         self.onTop = True
+        self.state = 0
 
         match self.gateSystem.id:
             case 'green':
@@ -450,23 +455,22 @@ class Lever:
 
     def update(self):
         
-        lista_unica = [item for sublist in self.Jogo.avatars_matrix[self.y:self.y+self.height, self.x:self.x+self.width].tolist() for item in sublist]
+        button_area_matrix = self.Jogo.avatars_matrix[self.y:self.y+self.height, self.x:self.x+self.width]     
 
-        if lista_unica.count(self.Jogo.avatar_number)>self.width*self.height/3:
-            
-            print('no botao!!')
+        if np.count_nonzero(button_area_matrix)>self.width*self.height/3:
             
             if self.onTop==False:
-                self.gateSystem.state = not self.gateSystem.state
+
+                self.state = not self.state
                 self.onTop = True
         else:
-            print('false')
+
             self.onTop = False
-        pass
+        
 
     def draw(self):
 
-        posicao_atual = self.animation[self.gateSystem.state]
+        posicao_atual = self.animation[self.state]
 
         pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
                    posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
@@ -475,18 +479,21 @@ class Lever:
 
 class Gate:
     
-    def __init__(self, x, y, Jogo, gateSystem):
+    def __init__(self, x, y, type, direction, Jogo, gateSystem):
         
         self.Jogo = Jogo
         self.gateSystem = gateSystem
 
         self.x = x
         self.y = y
+        self.type = type #type==0 -> normalmente fechado// type==1 -> normalmente aberto 
+        self.direction = direction
 
         self.width = 3
         self.height = 30
 
         self.matrix = np.zeros(self.Jogo.screenDim, np.int16)
+        self.state = 0
 
         match self.gateSystem.id:
             case 'green':
@@ -502,14 +509,26 @@ class Gate:
         pass
 
 
-    def update(self):
+    def update(self):  
 
-        new_x = self.x
-        new_y = self.y if self.gateSystem.state==0 else self.y-self.height-5
+        self.state = not self.gateSystem.state if self.type else self.gateSystem.state
 
-        # self.matrix = self.Jogo.obstacles_matrix.copy()
+        match self.direction:
+            case 'ver':
+                new_x = self.x
+                new_y = self.y if self.state == 0 else self.y - self.height - 5
 
-        self.Jogo.screen_matrix[new_y:new_y+self.height, new_x:new_x+self.width] = self.Jogo.floor_number
+                self.Jogo.screen_matrix[new_y:new_y+self.height, new_x:new_x+self.width] = self.Jogo.floor_number
+
+            case 'hor':
+                new_x = self.x if self.state == 0 else self.x-self.height-5
+                new_y = self.y
+
+                # Ajustar as coordenadas de origem para rotação de 90 graus
+                
+                self.Jogo.screen_matrix[new_y:new_y+self.width, new_x:new_x+self.height] = self.Jogo.floor_number
+
+        
 
         # self.Jogo.screen_matrix = self.Jogo.screen_matrix + self.matrix
         
@@ -517,15 +536,33 @@ class Gate:
         pass
 
     def draw(self):
-
         posicao_atual = self.animation[0]
-
-        new_x = self.x
-        new_y = self.y if self.gateSystem.state==0 else self.y-self.height-5
-
-        pyxel.blt(new_x, new_y, self.Jogo.image_buffer,
-                   posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
+        u = posicao_atual[0]
+        v = posicao_atual[1]
         
+        match self.direction:
+            case 'ver':
+                new_x = self.x
+                new_y = self.y if self.state == 0 else self.y - self.height - 5
+
+                pyxel.blt(new_x, new_y, self.Jogo.image_buffer, u, v, self.width, self.height, self.Jogo.background_remove)
+
+            case 'hor':
+                new_x = self.x if self.state == 0 else self.x-self.height-5
+                new_y = self.y
+
+                # Ajustar as coordenadas de origem para rotação de 90 graus
+                
+                self.draw_rotated_90(new_x, new_y, self.Jogo.image_buffer, u, v, self.width, self.height, self.Jogo.background_remove)
+
+        
+            
+    def draw_rotated_90(self, x, y, img, u, v, w, h, colkey):
+        for i in range(w):
+            for j in range(h):
+                color = pyxel.image(img).pget(u + i, v + j)
+                pyxel.pset(x + j, y + (w - 1 - i), color)                
+
         # self.Jogo.matrix_to_txt(self.Jogo.screen_matrix, 'newmatrix')
         
         pass

@@ -17,6 +17,11 @@ class Jogo:
         self.time = 40
         self.timer= self.fps*self.time
         self.pause = False
+
+        #INTERFACE
+        self.estado= 'menu'
+        self.menu= Menu()
+        self.escolhaLevel= EscolhaLevel()
         
         #DEFINIÇÕES DOS NUMEROS DE CADA OBJETO NA MATRIZ
         self.background_number = 0
@@ -133,9 +138,15 @@ class Jogo:
 
 
     def draw(self):
-        pyxel.cls(0)
+        if self.estado == "menu":
+            self.menu.draw()
+        elif self.estado=='level':
+            self.escolhaLevel.draw()
+        elif self.estado == "playing":
+            pyxel.cls(0)
+            pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7)
 
-        pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
+        # pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
 
         for door in self.doors:
             door.draw()
@@ -861,3 +872,47 @@ class Teste:
     def __init__(self) -> None:
 
         print('Teste')
+
+class Menu:
+    def __init__(self):
+        self.options_initial = ['START', 'EXIT']
+        self.option = 0
+
+    def update(self):
+        if pyxel.btnp(pyxel.KEY_UP):
+            self.option = (self.option - 1) % len(self.options_initial)
+        elif pyxel.btnp(pyxel.KEY_DOWN):
+            self.option = (self.option + 1) % len(self.options_initial)
+
+    def draw(self):
+        pyxel.cls(0)
+        pyxel.text(75,75,'CUTEBOY AND TALLGIRL', 11)
+        for i, option in enumerate(self.options_initial):
+            if i == self.option:     
+                color= 7
+            else: 
+                color= 8
+            pyxel.text(100, 110 + i * 10, option, color)
+
+class EscolhaLevel:
+    def __init__(self):
+        self.options_initial = ['Level 1', 'Level 2']
+        self.option = 0
+
+    def update(self):
+        if pyxel.btnp(pyxel.KEY_UP):
+            self.option = (self.option - 1) % len(self.options_initial)
+        elif pyxel.btnp(pyxel.KEY_DOWN):
+            self.option = (self.option + 1) % len(self.options_initial)
+
+    def draw(self):
+        pyxel.cls(0)
+        for i, option in enumerate(self.options_initial):
+            if i == self.option:     
+                color= 7
+            else: 
+                color= 8
+            pyxel.text(100, 110 + i * 10, option, color)
+
+
+Jogo()

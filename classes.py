@@ -15,6 +15,10 @@ class Jogo:
         #TEMPORIZADOR
         self.fps= 60
         self.timer= self.fps*30
+
+        #INTERFACE
+        self.estado= 'menu'
+        self.menu= Menu()
         
         #DEFINIÇÕES DOS NUMEROS DE CADA OBJETO NA MATRIZ
         self.background_number = 0
@@ -68,20 +72,31 @@ class Jogo:
 
     def update(self):
 
-        #aqui é pra funcionar o temporizador certinho e reiniciar
-        if self.timer > 0:
-            self.timer -= 1
-        else:
-            self.reset_jogo()
+        #interface
+        if self.estado == "menu":
+            self.menu.update()
         
-        self.screen_matrix = self.obstacles_matrix.copy()
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                if self.menu.options_initial[self.menu.option] == "START":
+                    self.estado = "playing"
+                elif self.menu.options_initial[self.menu.option] == "EXIT":
+                    pyxel.quit()  # sai do jogo
+        # se o estado for 'playing', inicia o jogo
+        elif self.estado == "playing":
+            #temporizador
+            if self.timer > 0:
+                self.timer -= 1
+            else:
+                self.reset_jogo() 
 
-        self.gate1.update()
-        self.gate2.update()
+            self.screen_matrix = self.obstacles_matrix.copy()
 
-        self.avatar1.update()
-        self.avatar2.update()
-        self.avatars_matrix = self.avatar1.position_matrix+self.avatar2.position_matrix
+            self.gate1.update()
+            self.gate2.update()
+
+            self.avatar1.update()
+            self.avatar2.update()
+            self.avatars_matrix = self.avatar1.position_matrix+self.avatar2.position_matrix
 
         # self.matrix_to_txt(self.avatars_matrix, 'testenew')
 
@@ -89,25 +104,28 @@ class Jogo:
 
 
     def draw(self):
-        pyxel.cls(0)
+        if self.estado == "menu":
+            self.menu.draw()
+        elif self.estado == "playing":
+            pyxel.cls(0)
+            pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7)
 
-        pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
+        # pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
 
         #portas
-        pyxel.blt(3, 218, 0, 51, 0, 65, 30, 13)
-        pyxel.blt(20, 223, 0, 51, 30, 55, 65, 13)
+            pyxel.blt(3, 218, 0, 51, 0, 65, 30, 13)
+            pyxel.blt(20, 223, 0, 51, 30, 55, 65, 13)
 
-        
-        self.avatar1.draw()
-        self.avatar2.draw()
-        
-        self.paint_screen(self.obstacles_matrix)
-        
-        self.gate1.draw()
-        self.gate2.draw()
-        
-    
-        pass
+            self.avatar1.draw()
+            self.avatar2.draw()
+            
+            self.paint_screen(self.obstacles_matrix)
+            
+            self.gate1.draw()
+            self.gate2.draw()
+
+
+            pass
 
 
     def add_rect_to_matrix(self, x, y, color, w=0, h=0):
@@ -570,10 +588,32 @@ class Portal:
         self.screenDim = self.Jogo.screenDim
 
 
-Jogo()
-
 class Teste:
     
     def __init__(self) -> None:
 
         print('Teste')
+
+class Menu:
+    def __init__(self):
+        self.options_initial = ['START', 'EXIT']
+        self.option = 0
+
+    def update(self):
+        if pyxel.btnp(pyxel.KEY_UP):
+            self.option = (self.option - 1) % len(self.options_initial)
+        elif pyxel.btnp(pyxel.KEY_DOWN):
+            self.option = (self.option + 1) % len(self.options_initial)
+
+    def draw(self):
+        pyxel.cls(0)
+        pyxel.text(75,75,'CUTEBOY AND TALLGIRL', 11)
+        for i, option in enumerate(self.options_initial):
+            if i == self.option:     
+                color= 7
+            else: 
+                color= 8
+            pyxel.text(100, 110 + i * 10, option, color)
+
+
+Jogo()

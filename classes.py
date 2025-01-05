@@ -1,4 +1,3 @@
-# copilot: disable
 import pyxel
 import numpy as np
 import time
@@ -14,16 +13,17 @@ class Jogo:
 
         #TEMPORIZADOR
         self.fps= 60
-        self.time = 40
+        self.time = 0
         self.timer= self.fps*self.time
         self.pause = False
 
-        self.ignore_timer = True
+        self.ignore_timer = False
 
         #INTERFACE
         self.estado= 'menu'
         self.menu = Menu()
         self.escolhaLevel= EscolhaLevel()
+        self.pauseMenu = PauseMenu()
         self.level = 1
         
         #DEFINIÇÕES DOS NUMEROS DE CADA OBJETO NA MATRIZ
@@ -56,11 +56,15 @@ class Jogo:
         #RODAR JOGO
         pyxel.run(self.update, self.draw)
 
-    def reset_jogo(self): #resetar e voltar pra posição inicial
+    def restart(self): #resetar e voltar pra posição inicial
         self.timer = self.fps*self.time
         
         for avatar in self.avatars:
             avatar.restart()
+
+        for obj in self.objects:
+            obj.reset()
+        
 
     def create_avatars(self):
 
@@ -78,7 +82,6 @@ class Jogo:
         self.objects = []
         self.doors = []
 
-        print('loading map')
 
         match self.level:
             case 0:
@@ -97,8 +100,8 @@ class Jogo:
 
                 self.obstacles_matrix = np.kron(self.obstacles_matrix_reduced, replication_matrix)
 
-                gate1 = GateSystem('purple', self, buttons=[[1, 59], [110, 59]], gates=[[100, 32, 0, 'ver'], [230, 62, 1, 'hor']])
-                gate2 = GateSystem('green', self, buttons=[[150, 59]], levers=[[210, 52]], gates=[[200, 32, 0, 'ver']])
+                gate1 = GateSystem('purple', self, buttons=[[1, 59], [110, 59]], gates=[[100, 32, 0, 'ver', False], [230, 62, 1, 'hor', False]])
+                gate2 = GateSystem('green', self, buttons=[[150, 59]], levers=[[210, 52]], gates=[[200, 32, 0, 'ver', False]])
 
                 portal1 = PortalSystem(self.avatars[0], [[35, 1, 'right'], [65, 140, 'left']], self, buttons=[[85, 59]])
 
@@ -117,11 +120,13 @@ class Jogo:
             
             case 1:
                 #avatares
+                self.avatars[0].set_initial_position(14, 175)
+                self.avatars[1].set_initial_position(14, 219)
+                
                 # self.avatars[0].set_initial_position(14, 9)
                 # self.avatars[1].set_initial_position(14, 9)
 
-                self.avatars[0].set_initial_position(14, 175)
-                self.avatars[1].set_initial_position(14, 219)
+                self.time = 35
 
                 pgm = imgppg("level1.pgm")
                 
@@ -135,8 +140,8 @@ class Jogo:
                 self.objects.append(Spike(165, 244, self))
                 self.objects.append(Spike(175, 189, self))
 
-                self.objects.append(GateSystem('green', self, levers=[[72, 157]], gates=[[9, 132, 0, 'hor']]))
-                self.objects.append(GateSystem('purple', self, buttons=[[80, 124], [178, 76]], gates=[[217, 82, 0, 'hor']]))
+                self.objects.append(GateSystem('green', self, levers=[[72, 157]], gates=[[9, 132, 0, 'hor', False]]))
+                self.objects.append(GateSystem('purple', self, buttons=[[80, 124], [178, 76]], gates=[[225, 82, 0, 'hor', False]]))
 
                 door1 = FinalDoor(200, 9, self.avatars[0], self)
                 door2 = FinalDoor(227, 14, self.avatars[1], self)
@@ -146,7 +151,9 @@ class Jogo:
             case 2:
                 #avatares
                 self.avatars[0].set_initial_position(18, 175)
-                self.avatars[1].set_initial_position(18, 219)
+                self.avatars[1].set_initial_position(30, 219)
+
+                self.time = 60
 
                 pgm = imgppg("level2.pgm")
                 
@@ -154,6 +161,22 @@ class Jogo:
                 replication_matrix = np.ones((8, 8), dtype=np.int16)
 
                 self.obstacles_matrix = np.kron(self.obstacles_matrix_reduced, replication_matrix)
+
+                self.objects.append(Spike(200, 204, self))
+                self.objects.append(Spike(210, 93, self))
+
+                self.objects.append(GateSystem('green', self, buttons=[[232, 205], [232, 85]], gates=[[80, 217, 0, 'ver', False], [9, 46, 0, 'hor', False]]))
+                self.objects.append(GateSystem('purple', self, levers=[[171, 238]], gates=[[110, 137, 0, 'ver', True]]))
+
+                self.objects.append(PortalSystem(self.avatars[1], [[8, 120, 'right'], [243, 8, 'left']], self, buttons=[[70, 37]]))
+
+                door1 = FinalDoor(195, 9, self.avatars[0], self)
+                door2 = FinalDoor(170, 14, self.avatars[1], self)
+                self.doors.append(door1)
+                self.doors.append(door2)
+
+            
+        self.timer = self.fps*self.time
     
     def update(self):
 
@@ -166,7 +189,7 @@ class Jogo:
                 if self.menu.options_initial[self.menu.option] == 'START':
                     self.estado = 'level'
 
-                elif self.menu.options_initial[self.menu.option] == "EXIT":
+                elif self.menu.options_initial[self.menu.option] == "QUIT GAME":
                     pyxel.quit()  # sai do jogo
 
         elif self.estado== 'level':
@@ -187,14 +210,13 @@ class Jogo:
         # se o estado for 'playing', inicia o jogo
         elif self.estado == "playing":
 
-            print(self.avatars[0].x, self.avatars[0].y)
 
             if not self.pause:
                 if self.timer > 0:
                     self.timer -= 1
                     
                 else:
-                    if not self.ignore_timer: self.reset_jogo()
+                    if not self.ignore_timer: self.restart()
             
                 self.screen_matrix = self.obstacles_matrix.copy()
 
@@ -214,9 +236,25 @@ class Jogo:
 
 
                 if sum(door.state for door in self.doors)==len(self.doors):
-                    print('YOU WIN')
                     self.pause=True
                     self.finish_level()
+            
+            else:
+                self.pauseMenu.update()
+
+                if pyxel.btnp(pyxel.KEY_RETURN):
+
+                    if self.pauseMenu.options_initial[self.pauseMenu.option] == 'Resume':
+                        pass
+
+                    elif self.pauseMenu.options_initial[self.pauseMenu.option] == "Restart":
+                        self.restart()
+                        
+                    elif self.pauseMenu.options_initial[self.pauseMenu.option] == "Exit":
+                        self.estado = "menu"
+                    
+                    self.pause=False
+
 
 
     def draw(self):
@@ -225,8 +263,10 @@ class Jogo:
         elif self.estado=='level':
             self.escolhaLevel.draw()
         elif self.estado == "playing":
+
             pyxel.cls(0)
-            pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7)
+            pyxel.text(10, 10, "remaining time: " + str(self.timer // self.fps), 7)
+            pyxel.text(10, 19, "level: " + str(self.level), 7)
 
             # pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
 
@@ -241,15 +281,18 @@ class Jogo:
 
             self.paint_screen()
 
-            
+            if self.pause: self.pauseMenu.draw()
 
     
     def finish_level(self):
         #ESCREVER AQUI O QUE ACONTECE QUANDO TERMINA A FASE
         self.level += 1
         self.load_map()
+        self.restart()
         self.pause = False
 
+    def pause_level(self):
+        self.pause = True
 
     def add_rect_to_matrix(self, x, y, color, w=0, h=0):
         
@@ -405,13 +448,7 @@ class Avatar:
             self.update_position(self.x+self.velocity, self.y)
 
         if pyxel.btn(pyxel.KEY_SPACE):
-            A=0
-        #    print(self.x, self.y)
-
-        if pyxel.btn(pyxel.KEY_SHIFT):
-            self.running = 3
-        else:
-            self.running = 1
+            self.Jogo.pause_level()
 
     def teletransport(self, x, y):
         self.x = x
@@ -629,7 +666,7 @@ class Button:
         if np.count_nonzero(button_area_matrix)>self.width*self.height/3:
 
             self.state = 1
-
+    
         else:
 
             self.state = 0
@@ -643,6 +680,7 @@ class Button:
         pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
                    posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
         pass
+
 
 class Lever:
 
@@ -669,8 +707,8 @@ class Lever:
                     ]
             case 'purple':
                 self.animation = [
-                    [31, 39],
-                    [41, 39]
+                    [41, 39],
+                    [31, 39]
                 ]
             case 'cuteboy':
                 self.animation = [
@@ -712,7 +750,7 @@ class Lever:
 
 class Gate:
     
-    def __init__(self, x, y, type, direction, Jogo, gateSystem):
+    def __init__(self, x, y, type, direction, dual, Jogo, gateSystem):
         
         self.Jogo = Jogo
         self.gateSystem = gateSystem
@@ -721,6 +759,7 @@ class Gate:
         self.y = y
         self.type = type #type==0 -> normalmente fechado// type==1 -> normalmente aberto 
         self.direction = direction
+        self.dual = dual
 
         self.width = 3
         self.height = 30
@@ -739,6 +778,7 @@ class Gate:
                     [31, 0]
                 ]
         
+        self.opennig_size = self.height - 4 if self.gateSystem.id == 'green' else (self.height+10 if self.dual else self.height)
         pass
 
 
@@ -749,12 +789,12 @@ class Gate:
         match self.direction:
             case 'ver':
                 new_x = self.x
-                new_y = self.y if self.state == 0 else self.y - self.height - 5
+                new_y = self.y if self.state == 0 else self.y - self.opennig_size
 
                 self.Jogo.screen_matrix[new_y:new_y+self.height, new_x:new_x+self.width] = self.Jogo.floor_number
 
             case 'hor':
-                new_x = self.x if self.state == 0 else self.x-self.height-5
+                new_x = self.x if self.state == 0 else self.x-self.opennig_size
                 new_y = self.y
 
                 # Ajustar as coordenadas de origem para rotação de 90 graus
@@ -773,12 +813,12 @@ class Gate:
         match self.direction:
             case 'ver':
                 new_x = self.x
-                new_y = self.y if self.state == 0 else self.y - self.height - 5
+                new_y = self.y if self.state == 0 else self.y - self.opennig_size
 
                 pyxel.blt(new_x, new_y, self.Jogo.image_buffer, u, v, self.width, self.height, self.Jogo.background_remove)
 
             case 'hor':
-                new_x = self.x if self.state == 0 else self.x-self.height-5
+                new_x = self.x if self.state == 0 else self.x-self.opennig_size
                 new_y = self.y
 
                 # Ajustar as coordenadas de origem para rotação de 90 graus
@@ -806,6 +846,7 @@ class GateSystem:
         self.Jogo = Jogo
 
         self.objects = []
+        self.gates = []
 
         for params in buttons:
             self.objects.append(Button(self.id, params[0], params[1], self.Jogo, self))
@@ -814,7 +855,7 @@ class GateSystem:
             self.objects.append(Lever(self.id, params[0], params[1], self.Jogo, self))
 
         for params in gates:
-            self.objects.append(Gate(params[0], params[1], params[2], params[3], self.Jogo, self))
+            self.gates.append(Gate(params[0], params[1], params[2], params[3], params[4], self.Jogo, self))
 
         self.state = 0 #0- não pressionado, 1-pressionado
 
@@ -822,16 +863,30 @@ class GateSystem:
 
     def update(self):
         
-        self.state = 0
+        # self.state = 0
         for obj in self.objects:
             obj.update()
-            if self.state==0: self.state = obj.state
+            # if self.state==0: self.state = obj.state
+
+        
+        self.state = 1 if sum(obj.state for obj in self.objects)>0 else 0
+
+        for gate in self.gates:
+            gate.update()
 
     def draw(self):
 
         for obj in self.objects:
             obj.draw()
 
+        for gate in self.gates:
+            gate.draw()
+
+    def reset(self):
+
+        self.state = 0
+        for obj in self.objects:
+            obj.state = 0
 
 class PortalSystem:
 
@@ -876,20 +931,20 @@ class PortalSystem:
 
         portal1_area_matrix = self.Jogo.avatars_matrix[self.portal1.y:self.portal1.y+self.portal1.height, self.portal1.x:self.portal1.x+self.portal1.width]
 
-        portal2_area_matrix = self.Jogo.avatars_matrix[self.portal2.y:self.portal2.y+self.portal2.height, self.portal1.x:self.portal2.x+self.portal2.width]
+        portal2_area_matrix = self.Jogo.avatars_matrix[self.portal2.y:self.portal2.y+self.portal2.height, self.portal2.x:self.portal2.x+self.portal2.width]
         
         for line in portal1_area_matrix:
             for elem in line:
 
                 if elem==self.avatar.avatar_number:  
-                    add_to_position = -self.avatar.width-1 if self.portal2.side=='right' else self.portal2.width+1
+                    add_to_position = -self.avatar.width-1 if self.portal2.side=='left' else self.portal2.width+1
                     self.avatar.teletransport(self.portal2.x+add_to_position, self.portal2.y)
 
         for line in portal2_area_matrix:
             for elem in line:
 
                 if elem==self.avatar.avatar_number:  
-                    add_to_position = -self.avatar.width-1 if self.portal1.side=='right' else self.portal1.width+1
+                    add_to_position = -self.avatar.width-1 if self.portal1.side=='left' else self.portal1.width+1
                     self.avatar.teletransport(self.portal1.x+add_to_position, self.portal1.y)
             
 
@@ -901,6 +956,12 @@ class PortalSystem:
         self.portal2.draw()
         for obj in self.objects:
             obj.draw()
+
+    def reset(self):
+
+        self.state = 0
+        for obj in self.objects:
+            obj.state = 0
 
 class Portal:
     
@@ -943,7 +1004,7 @@ class Portal:
 
         new_x = self.x
         new_y = self.y
-        new_w = self.width if self.side=='left' else -self.width
+        new_w = self.width
         new_h = self.height 
 
         pyxel.blt(new_x, new_y, self.Jogo.image_buffer, u, v, new_w, new_h, self.Jogo.background_remove)
@@ -972,7 +1033,7 @@ class Spike:
         
         if np.count_nonzero(area_matrix)>0:
 
-            self.Jogo.reset_jogo()
+            self.Jogo.restart()
 
     def draw(self):
 
@@ -982,15 +1043,13 @@ class Spike:
                    posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
         pass
 
-class Teste:
-    
-    def __init__(self) -> None:
+    def reset(self):
 
-        print('Teste')
+        pass
 
 class Menu:
     def __init__(self):
-        self.options_initial = ['START', 'EXIT']
+        self.options_initial = ['START', 'QUIT GAME']
         self.option = 0
 
     def update(self):
@@ -1028,6 +1087,33 @@ class EscolhaLevel:
             else: 
                 color= 8
             pyxel.text(100, 110 + i * 10, option, color)
+
+class PauseMenu:
+
+    def __init__(self):
+        self.options_initial = ['Resume', 'Restart', 'Exit']
+        self.option = 0
+
+    def update(self):
+
+        if pyxel.btnp(pyxel.KEY_UP):
+            self.option = (self.option - 1) % len(self.options_initial)
+        elif pyxel.btnp(pyxel.KEY_DOWN):
+            self.option = (self.option + 1) % len(self.options_initial)
+
+    def draw(self):
+        # pyxel.cls(0)
+
+        pyxel.rect(90, 90, 70, 16+ (len(self.options_initial) * 10), 0)
+
+        for i, option in enumerate(self.options_initial):
+            if i == self.option:     
+                color= 7
+            else: 
+                color= 8
+
+            pyxel.text(110, 110 + i * 10, option, color)
+        
 
 
 Jogo()

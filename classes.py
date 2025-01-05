@@ -148,7 +148,7 @@ class Jogo:
                 self.avatars[0].set_initial_position(18, 175)
                 self.avatars[1].set_initial_position(18, 219)
 
-                pgm = imgppg("level1.pgm")
+                pgm = imgppg("level2.pgm")
                 
                 self.obstacles_matrix_reduced = pgm.matrix
                 replication_matrix = np.ones((8, 8), dtype=np.int16)

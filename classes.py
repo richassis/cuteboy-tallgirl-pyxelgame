@@ -18,6 +18,8 @@ class Jogo:
         self.timer= self.fps*self.time
         self.pause = False
 
+        self.ignore_timer = True
+
         #INTERFACE
         self.estado= 'menu'
         self.menu = Menu()
@@ -28,8 +30,6 @@ class Jogo:
         self.background_number = 0
         self.floor_number = 1
         self.avatars_matrix_number = [2,3]
-
-        
         
         #INICIALIZA PYXEL
         pyxel.init(self.width, self.height, title="Jogo", fps=self.fps)
@@ -42,8 +42,8 @@ class Jogo:
         self.background_remove = 13
 
         #CRIAR MATRIZ COM OS OBSTACULOS (CHÃO)
-        self.obstacles_matrix = np.zeros(self.screenDim, np.int16)
-        self.obstacles_matrix_reduced = np.zeros((32, 32), np.int16)
+        self.obstacles_matrix = None
+        self.obstacles_matrix_reduced = None
 
 
         #AVATARES
@@ -78,8 +78,10 @@ class Jogo:
         self.objects = []
         self.doors = []
 
+        print('loading map')
+
         match self.level:
-            case 1:
+            case 0:
                 
                 #avatares
                 self.avatars[0].set_initial_position(1, 8)
@@ -91,10 +93,9 @@ class Jogo:
                 pgm = imgppg("obstacles2.pgm")
                 
                 self.obstacles_matrix_reduced = pgm.matrix
-                
-                for i in range(32):
-                    for j in range(32):
-                        self.obstacles_matrix[i*8:(i+1)*8, j*8:(j+1)*8] = self.obstacles_matrix_reduced[i, j]
+                replication_matrix = np.ones((8, 8), dtype=np.int16)
+
+                self.obstacles_matrix = np.kron(self.obstacles_matrix_reduced, replication_matrix)
 
                 gate1 = GateSystem('purple', self, buttons=[[1, 59], [110, 59]], gates=[[100, 32, 0, 'ver'], [230, 62, 1, 'hor']])
                 gate2 = GateSystem('green', self, buttons=[[150, 59]], levers=[[210, 52]], gates=[[200, 32, 0, 'ver']])
@@ -114,21 +115,46 @@ class Jogo:
                 self.doors.append(door1)
                 self.doors.append(door2)
             
-            case 2:
+            case 1:
                 #avatares
-                self.avatars[0].set_initial_position(1, 8)
-                self.avatars[1].set_initial_position(20, 8)
+                # self.avatars[0].set_initial_position(14, 9)
+                # self.avatars[1].set_initial_position(14, 9)
 
-                pgm = imgppg("obstacles2.pgm")
+                self.avatars[0].set_initial_position(14, 175)
+                self.avatars[1].set_initial_position(14, 219)
+
+                pgm = imgppg("level1.pgm")
                 
                 self.obstacles_matrix_reduced = pgm.matrix
-                
-                for i in range(32):
-                    for j in range(32):
-                        self.obstacles_matrix[i*8:(i+1)*8, j*8:(j+1)*8] = self.obstacles_matrix_reduced[i, j]
+                replication_matrix = np.ones((8, 8), dtype=np.int16)
 
-               
-        
+                self.obstacles_matrix = np.kron(self.obstacles_matrix_reduced, replication_matrix)
+
+
+                self.objects.append(Spike(125, 244, self))
+                self.objects.append(Spike(165, 244, self))
+                self.objects.append(Spike(175, 189, self))
+
+                self.objects.append(GateSystem('green', self, levers=[[72, 157]], gates=[[9, 132, 0, 'hor']]))
+                self.objects.append(GateSystem('purple', self, buttons=[[80, 124], [178, 76]], gates=[[217, 82, 0, 'hor']]))
+
+                door1 = FinalDoor(200, 9, self.avatars[0], self)
+                door2 = FinalDoor(227, 14, self.avatars[1], self)
+                self.doors.append(door1)
+                self.doors.append(door2)
+
+            case 2:
+                #avatares
+                self.avatars[0].set_initial_position(18, 175)
+                self.avatars[1].set_initial_position(18, 219)
+
+                pgm = imgppg("level1.pgm")
+                
+                self.obstacles_matrix_reduced = pgm.matrix
+                replication_matrix = np.ones((8, 8), dtype=np.int16)
+
+                self.obstacles_matrix = np.kron(self.obstacles_matrix_reduced, replication_matrix)
+    
     def update(self):
 
         #aqui é pra funcionar o temporizador certinho e reiniciar
@@ -160,12 +186,15 @@ class Jogo:
 
         # se o estado for 'playing', inicia o jogo
         elif self.estado == "playing":
-    
+
+            print(self.avatars[0].x, self.avatars[0].y)
+
             if not self.pause:
                 if self.timer > 0:
                     self.timer -= 1
+                    
                 else:
-                    self.reset_jogo()
+                    if not self.ignore_timer: self.reset_jogo()
             
                 self.screen_matrix = self.obstacles_matrix.copy()
 
@@ -187,7 +216,6 @@ class Jogo:
                 if sum(door.state for door in self.doors)==len(self.doors):
                     print('YOU WIN')
                     self.pause=True
-
                     self.finish_level()
 
 
@@ -208,16 +236,19 @@ class Jogo:
             for avatar in self.avatars:
                 avatar.draw()
             
-            self.paint_screen(self.obstacles_matrix)
-
             for obj in self.objects:
                 obj.draw()
+
+            self.paint_screen()
+
+            
 
     
     def finish_level(self):
         #ESCREVER AQUI O QUE ACONTECE QUANDO TERMINA A FASE
-        
-        pass
+        self.level += 1
+        self.load_map()
+        self.pause = False
 
 
     def add_rect_to_matrix(self, x, y, color, w=0, h=0):
@@ -231,12 +262,18 @@ class Jogo:
 
     
 
-    def paint_screen(self, matrix):
+    def paint_screen(self):
+        
+        width = self.obstacles_matrix_reduced.shape[0]
+        height = self.obstacles_matrix_reduced.shape[1]
+        for y in range(height):
+            for x in range(width):
+                if not self.obstacles_matrix_reduced[y,x] in [self.background_number]:
+                    
+                    # pyxel.pset(x, y, matrix[y,x])
 
-        for y in range(self.height):
-            for x in range(self.width):
-                if not matrix[y,x] in [self.background_number]:
-                    pyxel.pset(x, y, matrix[y,x])
+                    pyxel.blt(x*8, y*8, self.image_buffer,
+                        79, 0, 8, 8, self.background_remove)
 
     
     def matrix_to_txt(self, matrix, filename):
@@ -304,9 +341,7 @@ class Avatar:
         self.leftWall = False
 
         self.gravity_accel= 0.35
-        self.jump_y0 = 0
-        self.jump_vel = 8
-        self.jump_t = 0
+        self.max_fallspeed = 4
         self.fall_speed = 0
   
 
@@ -467,12 +502,11 @@ class Avatar:
                 self.animation_it = 0
 
     def gravity(self):
-        gravity_force = 1 
-        max_fall_speed = 5 
+        self.max_fallspeed = 5 
 
-        self.fall_speed = min(self.fall_speed + gravity_force, max_fall_speed)
+        self.fall_speed = min(self.fall_speed + self.gravity_accel, self.max_fallspeed)
 
-        target_y = self.y + self.fall_speed
+        target_y = int(np.ceil(self.y + self.fall_speed))
 
         self.update_position(self.x, target_y)
 
@@ -485,7 +519,7 @@ class Avatar:
     def jump(self):
         if self.onFloor and not self.jumping:
             self.jumping = True
-            self.fall_speed = -13
+            self.fall_speed = -7
 
 class FinalDoor:
 
@@ -507,14 +541,14 @@ class FinalDoor:
 
                 self.animation = [
                     [51, 0],
-                    [51, 0]
+                    [65, 0]
                     ]
             case 'cuteboy':
                 self.height = 25
 
                 self.animation = [
                     [51, 30],
-                    [51, 30]
+                    [65, 30]
                 ]
 
         pass
@@ -574,6 +608,16 @@ class Button:
                     [31, 52],
                     [41, 52]
                 ]
+            case 'cuteboy':
+                self.animation = [
+                    [94, 46],
+                    [94, 49]
+                ]
+            case 'tallgirl':
+                self.animation = [
+                    [94, 40],
+                    [94, 43]
+                ]
         
         pass
 
@@ -627,6 +671,16 @@ class Lever:
                 self.animation = [
                     [31, 39],
                     [41, 39]
+                ]
+            case 'cuteboy':
+                self.animation = [
+                    [94, 20],
+                    [94, 30]
+                ]
+            case 'tallgirl':
+                self.animation = [
+                    [94, 0],
+                    [94, 10]
                 ]
         
         pass
@@ -792,7 +846,7 @@ class PortalSystem:
         self.objects = []
 
         # self.id = self.avatar.avatar
-        self.id = 'green' if self.avatar.avatar=='cuteboy' else 'purple'
+        self.id = self.avatar.avatar
 
         for params in buttons:
             self.objects.append(Button(self.id, params[0], params[1], self.Jogo, self))
@@ -805,7 +859,11 @@ class PortalSystem:
 
     def update(self):  
 
-        self.state = 0
+        if len(self.objects)>0:
+            self.state = 0
+        else:
+            self.state = 1
+        
         for obj in self.objects:
             obj.update()
             if self.state==0: self.state = obj.state
@@ -855,8 +913,8 @@ class Portal:
         self.y = y
         self.side = side
 
-        self.width = 2
-        self.height = 30
+        self.width = 5
+        self.height = 32
 
         self.matrix = np.zeros(self.Jogo.screenDim, np.int16)
         self.state = 0 #0 - liberado; 1-travado
@@ -864,13 +922,13 @@ class Portal:
         match self.portalSystem.avatar.avatar:
             case 'tallgirl':
                 self.animation = [
-                    [33, 0],
-                    [31, 0]
+                    [79, 23],
+                    [84, 23]
                 ]
             case 'cuteboy':
                 self.animation = [
-                    [36, 0],
-                    [34, 0]
+                    [79, 23],
+                    [89, 23]
                 ]
 
 

@@ -20,8 +20,9 @@ class Jogo:
 
         #INTERFACE
         self.estado= 'menu'
-        self.menu= Menu()
+        self.menu = Menu()
         self.escolhaLevel= EscolhaLevel()
+        self.level = 1
         
         #DEFINIÇÕES DOS NUMEROS DE CADA OBJETO NA MATRIZ
         self.background_number = 0
@@ -48,11 +49,9 @@ class Jogo:
         #AVATARES
         self.avatars = []
         self.doors = []
-        self.create_avatars()
 
         #MAP OBJECTS
         self.objects = []
-        self.construct_map_objects(1)
 
         #RODAR JOGO
         pyxel.run(self.update, self.draw)
@@ -65,28 +64,30 @@ class Jogo:
 
     def create_avatars(self):
 
-        avatar1 = Avatar('tallgirl', 1, 8, 10, 30, self, ['W', 'A', 'S', 'D'], self.avatars_matrix_number[0])
+        avatar1 = Avatar('tallgirl', 10, 30, self, ['W', 'A', 'S', 'D'], self.avatars_matrix_number[0])
 
-        avatar2 = Avatar('cuteboy', 20, 8, 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'], self.avatars_matrix_number[1])
+        avatar2 = Avatar('cuteboy', 10, 25, self, ['UP', 'LEFT', 'DOWN', 'RIGHT'], self.avatars_matrix_number[1])
 
         self.avatars = [avatar1, avatar2]
         
         self.avatars_matrix = sum(avatar.position_matrix for avatar in self.avatars)
 
-        door1 = FinalDoor(3, 218, avatar1, self)
-        door2 = FinalDoor(20, 223, avatar2, self)
 
-        self.doors.append(door1)
-        self.doors.append(door2)
-
-
-    def construct_map_objects(self, level):
+    def load_map(self):
         
         self.objects = []
+        self.doors = []
 
-        match level:
+        match self.level:
             case 1:
                 
+                #avatares
+                self.avatars[0].set_initial_position(1, 8)
+                self.avatars[1].set_initial_position(20, 8)
+
+
+                #objetos
+
                 pgm = imgppg("obstacles2.pgm")
                 
                 self.obstacles_matrix_reduced = pgm.matrix
@@ -107,34 +108,87 @@ class Jogo:
                 self.objects.append(portal1)
                 self.objects.append(spike1)
 
+                door1 = FinalDoor(3, 218, self.avatars[0], self)
+                door2 = FinalDoor(20, 223, self.avatars[1], self)
 
+                self.doors.append(door1)
+                self.doors.append(door2)
+            
+            case 2:
+                #avatares
+                self.avatars[0].set_initial_position(1, 8)
+                self.avatars[1].set_initial_position(20, 8)
+
+                pgm = imgppg("obstacles2.pgm")
+                
+                self.obstacles_matrix_reduced = pgm.matrix
+                
+                for i in range(32):
+                    for j in range(32):
+                        self.obstacles_matrix[i*8:(i+1)*8, j*8:(j+1)*8] = self.obstacles_matrix_reduced[i, j]
+
+               
+        
     def update(self):
 
         #aqui é pra funcionar o temporizador certinho e reiniciar
-        if not self.pause:
-            if self.timer > 0:
-                self.timer -= 1
-            else:
-                self.reset_jogo()
+        if self.estado == "menu":
+            self.menu.update()
         
-            self.screen_matrix = self.obstacles_matrix.copy()
+            if pyxel.btnp(pyxel.KEY_RETURN):
 
-            for obj in self.objects:
-                obj.update()
+                if self.menu.options_initial[self.menu.option] == 'START':
+                    self.estado = 'level'
 
-            for avatar in self.avatars:
-                avatar.update()
+                elif self.menu.options_initial[self.menu.option] == "EXIT":
+                    pyxel.quit()  # sai do jogo
 
-            self.avatars_matrix = sum(avatar.position_matrix for avatar in self.avatars)
+        elif self.estado== 'level':
 
-            for door in self.doors:
-                door.update()
+            self.escolhaLevel.update()
 
-            if sum(door.state for door in self.doors)==len(self.doors):
-                print('YOU WIN')
-                self.pause=True
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                if self.escolhaLevel.options_initial[self.escolhaLevel.option] == 'Level 1':
+                    self.level = 1
+                    self.estado = 'playing'
+                elif self.escolhaLevel.options_initial[self.escolhaLevel.option] == "Level 2":
+                    self.level = 2
+                    self.estado = 'playing' 
+                
+                self.create_avatars()
+                self.load_map()
 
-                self.finish_level()
+        # se o estado for 'playing', inicia o jogo
+        elif self.estado == "playing":
+    
+            if not self.pause:
+                if self.timer > 0:
+                    self.timer -= 1
+                else:
+                    self.reset_jogo()
+            
+                self.screen_matrix = self.obstacles_matrix.copy()
+
+                for obj in self.objects:
+                    obj.update()
+
+                for avatar in self.avatars:
+                    avatar.update()
+
+                self.avatars_matrix = sum(avatar.position_matrix for avatar in self.avatars)
+
+                if self.doors == []:
+                    return
+                
+                for door in self.doors:
+                    door.update()
+
+
+                if sum(door.state for door in self.doors)==len(self.doors):
+                    print('YOU WIN')
+                    self.pause=True
+
+                    self.finish_level()
 
 
     def draw(self):
@@ -146,18 +200,18 @@ class Jogo:
             pyxel.cls(0)
             pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7)
 
-        # pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
+            # pyxel.text(10, 10, "tempo restante: " + str(self.timer // self.fps), 7) #quadros por segundoss
 
-        for door in self.doors:
-            door.draw()
+            for door in self.doors:
+                door.draw()
 
-        for avatar in self.avatars:
-            avatar.draw()
-        
-        self.paint_screen(self.obstacles_matrix)
+            for avatar in self.avatars:
+                avatar.draw()
+            
+            self.paint_screen(self.obstacles_matrix)
 
-        for obj in self.objects:
-            obj.draw()
+            for obj in self.objects:
+                obj.draw()
 
     
     def finish_level(self):
@@ -194,7 +248,7 @@ class Jogo:
 
 
 class Avatar:
-    def __init__(self, avatar, initial_x, initial_y, avatar_width, avatar_height, Jogo, mov_keys, matrix_number) -> None:
+    def __init__(self, avatar, avatar_width, avatar_height, Jogo, mov_keys, matrix_number) -> None:
 
         self.avatar = avatar
         self.avatar_number = matrix_number
@@ -227,11 +281,11 @@ class Avatar:
 
         self.movement_keys = mov_keys
 
-        self.start_x = initial_x
-        self.start_y = initial_y
+        self.start_x = 0
+        self.start_y = 0
 
-        self.x = initial_x
-        self.y = initial_y
+        self.x = 0
+        self.y = 0
 
         self.screenDim = self.Jogo.screenDim
 
@@ -279,6 +333,12 @@ class Avatar:
 
         pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
                    posicao_atual[0], posicao_atual[1], posicao_atual[2], posicao_atual[3], self.Jogo.background_remove)
+
+    def set_initial_position(self, x, y):
+        self.start_x = x
+        self.x = x
+        self.start_y = y
+        self.y = y
 
     def restart(self):
         self.teletransport(self.start_x, self.start_y)
@@ -863,9 +923,6 @@ class Spike:
         pyxel.blt(self.x, self.y, self.Jogo.image_buffer,
                    posicao_atual[0], posicao_atual[1], self.width, self.height, self.Jogo.background_remove)
         pass
-
-
-Jogo()
 
 class Teste:
     
